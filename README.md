@@ -72,7 +72,7 @@ The main table we export from.
 #### 5. Getting started
 ##### 5.1 Clone the repository
 ```
-git clone <your-repo-url>
+git clone https://github.com/Adarsh12325/cdc-export-system.git
 cd CDC-Export-System
 ```
 
@@ -242,21 +242,21 @@ Body similar to:
 ##### 8.4 Delta export
 Exports changed rows since the last export, plus an operation column that describes the change.
 
-** Endpoint:
+* Endpoint:
 
 POST /exports/delta
 
-** Headers:
+* Headers:
 
 X-Consumer-ID: <consumer-id>
 
-** Behavior:
+* Behavior:
 
-* Looks up the consumer’s watermark.
+ Looks up the consumer’s watermark.
 
-* Exports users where updated_at > last_exported_at (both active and soft-deleted).
+ Exports users where updated_at > last_exported_at (both active and soft-deleted).
 
-Adds an operation column:
+ Adds an operation column:
 
 * DELETE if is_deleted = TRUE
 
