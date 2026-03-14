@@ -129,28 +129,29 @@ This confirms seeding worked and timestamps are spread over multiple days.
 
 Type \q to exit psql.
 
-7. Environment variables
+##### 7. Environment variables
 All required environment variables are documented in .env.example.
 
-Typical values:
+* Typical values:
+```
 DATABASE_URL=postgresql://user:password@db:5432/mydatabase
 PORT=8080
 LOG_LEVEL=info
-
+```
 DATABASE_URL is used by the app to connect to the Postgres db service.
 
 PORT is the port that Uvicorn listens on inside the container.
 
 You normally don’t need a .env file when using docker-compose.yml, since it already sets these for the app service.
 
-8. API endpoints
+##### 8. API endpoints
 Base URL: http://localhost:8080
 
-8.1 Health
+##### 8.1 Health
 GET /health
 
 Response:
-
+```
 200 OK
 
 Body:
@@ -158,33 +159,33 @@ Body:
   "status": "ok",
   "timestamp": "<ISO 8601 timestamp>"
 }
+```
 
-
-8.2 Full export
+##### 8.2 Full export
 Triggers a full export of all non-deleted users for a given consumer.
 
-Endpoint:
+* Endpoint:
 
 POST /exports/full
 
-Headers:
+* Headers:
 
 X-Consumer-ID: <consumer-id>
 
-Behavior:
+* Behavior:
 
 Starts a background job.
 
 Exports all rows where is_deleted = FALSE.
 
-Writes a CSV file into the output/ directory, with columns:
+* Writes a CSV file into the output/ directory, with columns:
 
 id,name,email,created_at,updated_at,is_deleted
 
-Updates the watermark for that consumer-id to the max updated_at of the exported rows.
+* Updates the watermark for that consumer-id to the max updated_at of the exported rows.
 
 Response:
-
+```
 202 Accepted
 
 Body example:
@@ -194,34 +195,34 @@ Body example:
   "exportType": "full",
   "outputFilename": "full_consumer-1_20260226T043000Z.csv"
 }
-
-8.3 Incremental export
+```
+##### 8.3 Incremental export
 Exports only rows changed since the last export for this consumer.
 
-Endpoint:
+* Endpoint:
 
 POST /exports/incremental
 
-Headers:
+* Headers:
 
 X-Consumer-ID: <consumer-id>
 
-Behavior:
+* Behavior:
 
 Looks up the consumer’s watermark in watermarks.last_exported_at.
 
-Exports users where:
+* Exports users where:
 
 updated_at > last_exported_at
 
-is_deleted = FALSE
+ is_deleted = FALSE
 
-Writes the same CSV format as full export.
+* Writes the same CSV format as full export.
 
-Updates the watermark to the max updated_at of this export batch.[web:49][web:118]
+* Updates the watermark to the max updated_at of this export batch.[web:49][web:118]
 
 Response:
-
+```
 202 Accepted
 
 Body similar to:
@@ -231,40 +232,40 @@ Body similar to:
   "exportType": "incremental",
   "outputFilename": "incremental_consumer-1_20260226T043500Z.csv"
 }
-
-8.4 Delta export
+```
+##### 8.4 Delta export
 Exports changed rows since the last export, plus an operation column that describes the change.
 
-Endpoint:
+** Endpoint:
 
 POST /exports/delta
 
-Headers:
+** Headers:
 
 X-Consumer-ID: <consumer-id>
 
-Behavior:
+** Behavior:
 
-Looks up the consumer’s watermark.
+* Looks up the consumer’s watermark.
 
-Exports users where updated_at > last_exported_at (both active and soft-deleted).
+* Exports users where updated_at > last_exported_at (both active and soft-deleted).
 
 Adds an operation column:
 
-DELETE if is_deleted = TRUE
+* DELETE if is_deleted = TRUE
 
-INSERT if created_at == updated_at
+* INSERT if created_at == updated_at
 
-UPDATE otherwise
+* UPDATE otherwise
 
 CSV columns:
 
-operation,id,name,email,created_at,updated_at,is_deleted
+* operation,id,name,email,created_at,updated_at,is_deleted
 
-Updates the watermark to the max updated_at of the exported rows.[web:49][web:118]
+* Updates the watermark to the max updated_at of the exported rows.[web:49][web:118]
 
-Response:
-
+* Response:
+```
 202 Accepted
 
 Body similar to:
@@ -274,30 +275,30 @@ Body similar to:
   "exportType": "delta",
   "outputFilename": "delta_consumer-1_20260226T043800Z.csv"
 }
+```
 
-8.5 Get watermark
+##### 8.5 Get watermark
 Returns the current watermark for a consumer.
 
-Endpoint:
+** Endpoint:
 
 GET /exports/watermark
 
-Headers:
+** Headers:
 
-X-Consumer-ID: <consumer-id>
+** X-Consumer-ID: <consumer-id>
 
-Behavior:
+** Behavior:
 
-If a watermark exists:
+* If a watermark exists:
 
-Returns 200 with the consumer ID and last exported timestamp.
+* Returns 200 with the consumer ID and last exported timestamp.
 
-If no watermark exists (consumer never exported):
+* If no watermark exists (consumer never exported):
 
-Returns 404 with a descriptive message.
-
-Responses:
-
+* Returns 404 with a descriptive message.
+* Responses:
+```
 200 OK
 {
   "consumerId": "consumer-1",
@@ -309,73 +310,62 @@ Responses:
 {
   "detail": "No watermark for this consumer"
 }
+```
+##### 9. Watermarking logic (how CDC works here)
+* This service uses timestamp-based CDC with per-consumer watermarks
+* For each consumer, watermarks.last_exported_at stores the last exported high-water mark.
 
-9. Watermarking logic (how CDC works here)
-This service uses timestamp-based CDC with per-consumer watermarks
-For each consumer, watermarks.last_exported_at stores the last exported high-water mark.
+###### Full export:
 
-Full export:
+* Reads all non-deleted rows.
+* Sets watermark to the max updated_at.
+* Incremental / delta export:
+* Reads rows where updated_at > last_exported_at.
+* After writing the CSV, updates the watermark to the new max updated_at.
+* Export + watermark update runs inside a transaction at the DB layer:
+* If CSV writing or any part fails, the job logs an error and the transaction is rolled back.
+* Watermark is not advanced on failure, so you never “skip” data.
+* This makes exports restartable and safe, at the cost of not capturing every intermediate update between exports (only the latest state of each row is exported).
+  
+##### 10. Logs
+* The export job runner emits structured logs for each job:[web:104][web:111]
 
-Reads all non-deleted rows.
-
-Sets watermark to the max updated_at.
-
-Incremental / delta export:
-
-Reads rows where updated_at > last_exported_at.
-
-After writing the CSV, updates the watermark to the new max updated_at.
-
-Export + watermark update runs inside a transaction at the DB layer:
-
-If CSV writing or any part fails, the job logs an error and the transaction is rolled back.
-
-Watermark is not advanced on failure, so you never “skip” data.
-
-This makes exports restartable and safe, at the cost of not capturing every intermediate update between exports (only the latest state of each row is exported).
-
-10. Logs
-The export job runner emits structured logs for each job:[web:104][web:111]
-
-When a job starts:
+* When a job starts:
 
 event = "export_started"
 
 jobId, consumerId, exportType
 
-When a job completes:
+* When a job completes:
 
 event = "export_completed"
 
 jobId, rowsExported, durationSeconds
 
-When a job fails:
+* When a job fails:
 
 event = "export_failed"
 
 jobId, error
 
-You can view logs with:
+*You can view logs with:
+```
 docker logs cdc-export-system-app-1
-
-11. Testing
-Tests are written with pytest and FastAPI’s TestClient:[web:94][web:95][web:120]
-
-tests/test_health.py – checks the /health endpoint.
-
-tests/test_exports_full.py – verifies full export CSV content and watermark update.
-
-tests/test_exports_incremental.py – verifies only updated rows are exported.
-
-tests/test_exports_delta.py – verifies operation is correctly set to INSERT / UPDATE / DELETE.
-
-tests/test_watermark_logic.py – checks watermark insert / update logic.
-
-Run tests with coverage inside the app container:
+```
+##### 11. Testing
+* Tests are written with pytest and FastAPI’s TestClient:[web:94][web:95][web:120]
+* tests/test_health.py – checks the /health endpoint.
+* tests/test_exports_full.py – verifies full export CSV content and watermark update.
+* tests/test_exports_incremental.py – verifies only updated rows are exported.
+* tests/test_exports_delta.py – verifies operation is correctly set to INSERT / UPDATE / DELETE.
+* tests/test_watermark_logic.py – checks watermark insert / update logic.
+* Run tests with coverage inside the app container:
+```
 docker-compose run --rm app pytest --cov=app --cov-report=term-missing
-
-12. Project structure
+```
+##### 12. Project structure
 For reference, the repository is organized as:
+```
 .
 ├── app
 │   ├── __init__.py
@@ -404,15 +394,15 @@ For reference, the repository is organized as:
 ├── .env.example
 ├── .gitignore
 └── README.md
+```
 
-13. Extending this project
-This implementation keeps everything in a single service for simplicity. In a real production environment, you might:
+##### 13. Extending this project
+* This implementation keeps everything in a single service for simplicity. In a real production environment, you might:
 
-Move export jobs into a separate worker service.
+* Move export jobs into a separate worker service.
 
-Use a message broker (RabbitMQ, Kafka, SQS, etc.) to queue export jobs.
+* Use a message broker (RabbitMQ, Kafka, SQS, etc.) to queue export jobs.
 
-Send CSVs directly to cloud storage (S3, GCS, Azure Blob) instead of a local volume.
+* Send CSVs directly to cloud storage (S3, GCS, Azure Blob) instead of a local volume.
 
-The patterns in this project (watermarking, async jobs, structured logs) provide a solid base for that kind of evolution.
------------------------------conclusion--------------------------------------------
+* The patterns in this project (watermarking, async jobs, structured logs) provide a solid base for that kind of evolution.
