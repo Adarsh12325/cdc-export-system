@@ -10,7 +10,7 @@ Exports run as **asynchronous background jobs** and write CSV files into a share
 
 ---
 
-##### 1. What this service does
+#### 1. What this service does
 
 In many systems you need to sync data from a production database into other systems (data warehouse, search index, etc.). Exporting the entire table every time is too slow and expensive for large tables.
 
@@ -25,7 +25,7 @@ This gives you efficient, resumable exports without needing log-based CDC tools.
 
 ---
 
-## 2. Tech stack
+#### 2. Tech stack
 
 - **Language:** Python (FastAPI)
 - **Database:** PostgreSQL 13
@@ -37,7 +37,7 @@ Everything runs in containers; you don’t need a local Postgres or Python envir
 
 ---
 
-## 3. Data model
+#### 3. Data model
 
 ### users
 
@@ -66,14 +66,14 @@ The main table we export from.
 
 Git installed
 
-##### 5. Getting started
-###### 5.1 Clone the repository
+#### 5. Getting started
+##### 5.1 Clone the repository
 ```
 git clone <your-repo-url>
 cd CDC-Export-System
 ```
 
-###### 5.2 Run the stack
+##### 5.2 Run the stack
 ```
 docker-compose up --build
 ```
@@ -86,7 +86,7 @@ What happens:
 * Marks at least 1% as is_deleted = TRUE.
 * After seeding, the FastAPI server starts on port 8080.[web:44][web:41][web:48]
 
-###### 5.3 Health check
+##### 5.3 Health check
 Once the containers are up, you can verify the service:
 ####### Linux / macOS / Git Bash
 ```
@@ -103,7 +103,7 @@ Expected response (200 OK):
   "timestamp": "2026-02-26T04:30:00.000000+00:00"
 }
 ```
-###### 6. Inspecting the database (optional)
+#### 6. Inspecting the database (optional)
 Open a psql shell into the Postgres container:
 ```
 docker exec -it cdc-export-system-db-1 psql -U user -d mydatabase
@@ -127,7 +127,7 @@ This confirms seeding worked and timestamps are spread over multiple days.
 
 - Type \q to exit psql.
 
-##### 7. Environment variables
+#### 7. Environment variables
 All required environment variables are documented in .env.example.
 
 * Typical values:
@@ -142,7 +142,7 @@ PORT is the port that Uvicorn listens on inside the container.
 
 You normally don’t need a .env file when using docker-compose.yml, since it already sets these for the app service.
 
-##### 8. API endpoints
+#### 8. API endpoints
 Base URL: http://localhost:8080
 
 ##### 8.1 Health
@@ -309,11 +309,11 @@ GET /exports/watermark
   "detail": "No watermark for this consumer"
 }
 ```
-##### 9. Watermarking logic (how CDC works here)
+#### 9. Watermarking logic (how CDC works here)
 * This service uses timestamp-based CDC with per-consumer watermarks
 * For each consumer, watermarks.last_exported_at stores the last exported high-water mark.
 
-###### Full export:
+##### Full export:
 
 * Reads all non-deleted rows.
 * Sets watermark to the max updated_at.
@@ -325,7 +325,7 @@ GET /exports/watermark
 * Watermark is not advanced on failure, so you never “skip” data.
 * This makes exports restartable and safe, at the cost of not capturing every intermediate update between exports (only the latest state of each row is exported).
   
-##### 10. Logs
+#### 10. Logs
 * The export job runner emits structured logs for each job:[web:104][web:111]
 
 * When a job starts:
@@ -350,7 +350,7 @@ jobId, error
 ```
 docker logs cdc-export-system-app-1
 ```
-##### 11. Testing
+#### 11. Testing
 * Tests are written with pytest and FastAPI’s TestClient:[web:94][web:95][web:120]
 * tests/test_health.py – checks the /health endpoint.
 * tests/test_exports_full.py – verifies full export CSV content and watermark update.
@@ -361,7 +361,7 @@ docker logs cdc-export-system-app-1
 ```
 docker-compose run --rm app pytest --cov=app --cov-report=term-missing
 ```
-##### 12. Project structure
+#### 12. Project structure
 For reference, the repository is organized as:
 ```
 .
@@ -394,7 +394,7 @@ For reference, the repository is organized as:
 └── README.md
 ```
 
-##### 13. Extending this project
+#### 13. Extending this project
 * This implementation keeps everything in a single service for simplicity. In a real production environment, you might:
 
 * Move export jobs into a separate worker service.
