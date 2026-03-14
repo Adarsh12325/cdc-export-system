@@ -61,10 +61,13 @@ The main table we export from.
 - updated_at TIMESTAMPTZ NOT NULL
 - For each consumer_id, last_exported_at stores the max updated_at from that consumer’s last successful export.
 
-##### 4. Prerequisites
-* Docker installed (Docker Desktop on Windows/macOS, or Docker Engine + Compose on Linux)
+---
 
-Git installed
+#### 4. Prerequisites
+* Docker installed (Docker Desktop on Windows/macOS, or Docker Engine + Compose on Linux)
+* Git installed
+
+---
 
 #### 5. Getting started
 ##### 5.1 Clone the repository
@@ -103,6 +106,7 @@ Expected response (200 OK):
   "timestamp": "2026-02-26T04:30:00.000000+00:00"
 }
 ```
+---
 #### 6. Inspecting the database (optional)
 Open a psql shell into the Postgres container:
 ```
@@ -127,6 +131,8 @@ This confirms seeding worked and timestamps are spread over multiple days.
 
 - Type \q to exit psql.
 
+---
+
 #### 7. Environment variables
 All required environment variables are documented in .env.example.
 
@@ -141,6 +147,8 @@ DATABASE_URL is used by the app to connect to the Postgres db service.
 PORT is the port that Uvicorn listens on inside the container.
 
 You normally don’t need a .env file when using docker-compose.yml, since it already sets these for the app service.
+
+--- 
 
 #### 8. API endpoints
 Base URL: http://localhost:8080
@@ -309,6 +317,8 @@ GET /exports/watermark
   "detail": "No watermark for this consumer"
 }
 ```
+---
+
 #### 9. Watermarking logic (how CDC works here)
 * This service uses timestamp-based CDC with per-consumer watermarks
 * For each consumer, watermarks.last_exported_at stores the last exported high-water mark.
@@ -324,7 +334,9 @@ GET /exports/watermark
 * If CSV writing or any part fails, the job logs an error and the transaction is rolled back.
 * Watermark is not advanced on failure, so you never “skip” data.
 * This makes exports restartable and safe, at the cost of not capturing every intermediate update between exports (only the latest state of each row is exported).
-  
+
+---
+
 #### 10. Logs
 * The export job runner emits structured logs for each job:[web:104][web:111]
 
@@ -350,6 +362,9 @@ jobId, error
 ```
 docker logs cdc-export-system-app-1
 ```
+
+---
+
 #### 11. Testing
 * Tests are written with pytest and FastAPI’s TestClient:[web:94][web:95][web:120]
 * tests/test_health.py – checks the /health endpoint.
@@ -361,6 +376,9 @@ docker logs cdc-export-system-app-1
 ```
 docker-compose run --rm app pytest --cov=app --cov-report=term-missing
 ```
+
+---
+
 #### 12. Project structure
 For reference, the repository is organized as:
 ```
@@ -393,6 +411,7 @@ For reference, the repository is organized as:
 ├── .gitignore
 └── README.md
 ```
+---
 
 #### 13. Extending this project
 * This implementation keeps everything in a single service for simplicity. In a real production environment, you might:
