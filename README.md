@@ -10,7 +10,7 @@ Exports run as **asynchronous background jobs** and write CSV files into a share
 
 ---
 
-## 1. What this service does
+##### 1. What this service does
 
 In many systems you need to sync data from a production database into other systems (data warehouse, search index, etc.). Exporting the entire table every time is too slow and expensive for large tables.
 
@@ -53,66 +53,64 @@ The main table we export from.
   ```sql
   CREATE INDEX idx_users_updated_at ON users(updated_at);
 
-watermarks
-Tracks progress per consumer (downstream system).
+###### watermarks
+- Tracks progress per consumer (downstream system).
+- id SERIAL PRIMARY KEY
+- consumer_id VARCHAR(255) NOT NULL UNIQUE
+- last_exported_at TIMESTAMPTZ NOT NULL
+- updated_at TIMESTAMPTZ NOT NULL
+- For each consumer_id, last_exported_at stores the max updated_at from that consumer’s last successful export.
 
-id SERIAL PRIMARY KEY
-
-consumer_id VARCHAR(255) NOT NULL UNIQUE
-
-last_exported_at TIMESTAMPTZ NOT NULL
-
-updated_at TIMESTAMPTZ NOT NULL
-
-For each consumer_id, last_exported_at stores the max updated_at from that consumer’s last successful export.
-
-4. Prerequisites
-Docker installed (Docker Desktop on Windows/macOS, or Docker Engine + Compose on Linux)
+##### 4. Prerequisites
+* Docker installed (Docker Desktop on Windows/macOS, or Docker Engine + Compose on Linux)
 
 Git installed
 
-5. Getting started
-5.1 Clone the repository
+##### 5. Getting started
+###### 5.1 Clone the repository
+```
 git clone <your-repo-url>
 cd CDC-Export-System
+```
 
-5.2 Run the stack
+###### 5.2 Run the stack
+```
 docker-compose up --build
-
+```
 What happens:
+* The db service (Postgres) starts and runs seeds/001_schema.sql.
+* The app service waits for the DB to be healthy.
+* The app runs app/seed_users.py once, which:
+* Creates at least 100,000 fake users.
+* Distributes created_at and updated_at over the last ~30 days.
+* Marks at least 1% as is_deleted = TRUE.
+* After seeding, the FastAPI server starts on port 8080.[web:44][web:41][web:48]
 
-The db service (Postgres) starts and runs seeds/001_schema.sql.
-
-The app service waits for the DB to be healthy.
-
-The app runs app/seed_users.py once, which:
-
-Creates at least 100,000 fake users.
-
-Distributes created_at and updated_at over the last ~30 days.
-
-Marks at least 1% as is_deleted = TRUE.
-
-After seeding, the FastAPI server starts on port 8080.[web:44][web:41][web:48]
-
-5.3 Health check
+###### 5.3 Health check
 Once the containers are up, you can verify the service:
-# Linux / macOS / Git Bash
+####### Linux / macOS / Git Bash
+```
 curl http://localhost:8080/health
-
-# PowerShell
+```
+####### PowerShell
+```
 Invoke-WebRequest http://localhost:8080/health
-
+```
 Expected response (200 OK):
+```
 {
   "status": "ok",
   "timestamp": "2026-02-26T04:30:00.000000+00:00"
 }
-6. Inspecting the database (optional)
+```
+###### 6. Inspecting the database (optional)
 Open a psql shell into the Postgres container:
+```
 docker exec -it cdc-export-system-db-1 psql -U user -d mydatabase
+```
 
-Some checks you can run:
+* Some checks you can run:
+```
 -- Total users
 SELECT COUNT(*) FROM users;
 
@@ -124,10 +122,10 @@ SELECT COUNT(*) FROM users WHERE is_deleted = TRUE;
 
 -- Range of updated_at timestamps
 SELECT MIN(updated_at), MAX(updated_at) FROM users;
-
+```
 This confirms seeding worked and timestamps are spread over multiple days.
 
-Type \q to exit psql.
+- Type \q to exit psql.
 
 ##### 7. Environment variables
 All required environment variables are documented in .env.example.
