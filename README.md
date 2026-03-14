@@ -128,7 +128,6 @@ SELECT COUNT(*) FROM users WHERE is_deleted = TRUE;
 SELECT MIN(updated_at), MAX(updated_at) FROM users;
 ```
 This confirms seeding worked and timestamps are spread over multiple days.
-
 - Type \q to exit psql.
 
 ---
@@ -142,11 +141,9 @@ DATABASE_URL=postgresql://user:password@db:5432/mydatabase
 PORT=8080
 LOG_LEVEL=info
 ```
-DATABASE_URL is used by the app to connect to the Postgres db service.
-
-PORT is the port that Uvicorn listens on inside the container.
-
-You normally don’t need a .env file when using docker-compose.yml, since it already sets these for the app service.
+- DATABASE_URL is used by the app to connect to the Postgres db service.
+- PORT is the port that Uvicorn listens on inside the container.
+- You normally don’t need a .env file when using docker-compose.yml, since it already sets these for the app service.
 
 --- 
 
@@ -171,23 +168,18 @@ Body:
 Triggers a full export of all non-deleted users for a given consumer.
 
 * Endpoint:
-
 POST /exports/full
 
 * Headers:
-
 X-Consumer-ID: <consumer-id>
 
 * Behavior:
-
 Starts a background job.
 
 Exports all rows where is_deleted = FALSE.
-
 * Writes a CSV file into the output/ directory, with columns:
 
 id,name,email,created_at,updated_at,is_deleted
-
 * Updates the watermark for that consumer-id to the max updated_at of the exported rows.
 
 Response:
@@ -206,25 +198,18 @@ Body example:
 Exports only rows changed since the last export for this consumer.
 
 * Endpoint:
-
 POST /exports/incremental
 
 * Headers:
-
 X-Consumer-ID: <consumer-id>
 
 * Behavior:
-
 Looks up the consumer’s watermark in watermarks.last_exported_at.
 
 * Exports users where:
-
 updated_at > last_exported_at
-
  is_deleted = FALSE
-
 * Writes the same CSV format as full export.
-
 * Updates the watermark to the max updated_at of this export batch.[web:49][web:118]
 
 Response:
@@ -243,31 +228,22 @@ Body similar to:
 Exports changed rows since the last export, plus an operation column that describes the change.
 
 * Endpoint:
-
 POST /exports/delta
 
 * Headers:
-
 X-Consumer-ID: <consumer-id>
 
 * Behavior:
-
  Looks up the consumer’s watermark.
-
  Exports users where updated_at > last_exported_at (both active and soft-deleted).
 
  Adds an operation column:
-
 * DELETE if is_deleted = TRUE
-
 * INSERT if created_at == updated_at
-
 * UPDATE otherwise
 
 CSV columns:
-
 * operation,id,name,email,created_at,updated_at,is_deleted
-
 * Updates the watermark to the max updated_at of the exported rows.[web:49][web:118]
 
 * Response:
@@ -286,22 +262,16 @@ Body similar to:
 ##### 8.5 Get watermark
 Returns the current watermark for a consumer.
 
-** Endpoint:
-
+* Endpoint:
 GET /exports/watermark
 
-** Headers:
+* Headers:
+X-Consumer-ID: <consumer-id>
 
-** X-Consumer-ID: <consumer-id>
-
-** Behavior:
-
-* If a watermark exists:
-
+* Behavior:
+If a watermark exists:
 * Returns 200 with the consumer ID and last exported timestamp.
-
 * If no watermark exists (consumer never exported):
-
 * Returns 404 with a descriptive message.
 * Responses:
 ```
@@ -341,21 +311,15 @@ GET /exports/watermark
 * The export job runner emits structured logs for each job:[web:104][web:111]
 
 * When a job starts:
-
 event = "export_started"
 
 jobId, consumerId, exportType
-
 * When a job completes:
-
 event = "export_completed"
-
 jobId, rowsExported, durationSeconds
 
 * When a job fails:
-
 event = "export_failed"
-
 jobId, error
 
 *You can view logs with:
@@ -415,11 +379,7 @@ For reference, the repository is organized as:
 
 #### 13. Extending this project
 * This implementation keeps everything in a single service for simplicity. In a real production environment, you might:
-
 * Move export jobs into a separate worker service.
-
 * Use a message broker (RabbitMQ, Kafka, SQS, etc.) to queue export jobs.
-
 * Send CSVs directly to cloud storage (S3, GCS, Azure Blob) instead of a local volume.
-
 * The patterns in this project (watermarking, async jobs, structured logs) provide a solid base for that kind of evolution.
